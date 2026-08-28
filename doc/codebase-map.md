@@ -33,6 +33,9 @@ first. For the conceptual layering behind this layout, see
   `compile.rs`, `bundle/`, `coverage/`, `lint/`, `pm/` (package management),
   `installer/`, `jupyter/`, `publish/`, `repl/`, and `serve.rs`.
 - `cli/lsp/` — the language server.
+- `cli/tsc/` — TypeScript compiler integration: the Rust client and JS host for
+  the in-process compiler, plus the client for the out-of-process native
+  (`tsgo`) type-checker that `deno check` runs.
 - `cli/module_loader.rs`, `cli/graph_util.rs` — module graph construction and
   loading.
 
@@ -62,8 +65,7 @@ packaging:
   `npm_installer`, `npmrc`, `package_json`, `lockfile`, `config`, `cli_parser`,
   `cache_dir`.
 - **Other building blocks:** `crypto`, `dotenv`, `eszip`, `http_h1`,
-  `inspector_server`, `maybe_sync`, `napi_sys`, `node_shim`,
-  `typescript_go_client`.
+  `inspector_server`, `maybe_sync`, `napi_sys`, `node_shim`.
 
 ## Inside `tests/`
 
