@@ -1040,6 +1040,12 @@ use zstd::stream::raw::Operation; // Trait for run/flush/finish methods
 struct ZstdCompressCtx {
   encoder: ZstdRawEncoder<'static>,
   callback: v8::Global<v8::Function>,
+  /// Whether the end-of-frame marker has been fully written. `finish()` must
+  /// be called exactly once per frame: calling it again on an
+  /// already-finished frame makes zstd start (and write the header of) a new
+  /// empty frame, which is how `zstdCompress*` used to append 9 stray bytes
+  /// when the completed frame ended exactly on an output-chunk boundary.
+  finished: bool,
 }
 
 pub struct ZstdCompress {
@@ -1139,7 +1145,11 @@ impl ZstdCompress {
     self
       .ctx
       .borrow_mut()
-      .replace(ZstdCompressCtx { encoder, callback });
+      .replace(ZstdCompressCtx {
+        encoder,
+        callback,
+        finished: false,
+      });
     true
   }
 
@@ -1153,6 +1163,9 @@ impl ZstdCompress {
     let mut ctx = self.ctx.borrow_mut();
     if let Some(ctx) = ctx.as_mut() {
       let _ = ctx.encoder.reinit();
+      // `reinit()` prepares the encoder for a new frame, so the end marker
+      // still has to be written once more.
+      ctx.finished = false;
     }
   }
 
@@ -1213,9 +1226,21 @@ impl ZstdCompress {
             .map_err(|e| {
               JsErrorBox::generic(format!("Zstd compress error: {}", e))
             })?;
-          ctx.encoder.finish(&mut out_buffer, true).map_err(|e| {
-            JsErrorBox::generic(format!("Zstd finish error: {}", e))
-          })?;
+          if !ctx.finished {
+            // `finish()` writes the end-of-frame marker and returns the
+            // number of bytes still to write; keep calling it until it
+            // returns 0, and never again after that. The JS write loop
+            // re-enters this op whenever the output chunk fills up, so
+            // without the flag the marker would be written a second time,
+            // appending a new empty frame to the output.
+            let remaining = ctx
+              .encoder
+              .finish(&mut out_buffer, true)
+              .map_err(|e| {
+                JsErrorBox::generic(format!("Zstd finish error: {}", e))
+              })?;
+            ctx.finished = remaining == 0;
+          }
         }
         _ => {
           ctx
@@ -1297,9 +1322,21 @@ impl ZstdCompress {
           .map_err(|e| {
             JsErrorBox::generic(format!("Zstd compress error: {}", e))
           })?;
-        ctx.encoder.finish(&mut out_buffer, true).map_err(|e| {
-          JsErrorBox::generic(format!("Zstd finish error: {}", e))
-        })?;
+        if !ctx.finished {
+          // `finish()` writes the end-of-frame marker and returns the number
+          // of bytes still to write; keep calling it until it returns 0, and
+          // never again after that. The JS write loop re-enters this op
+          // whenever the output chunk fills up, so without the flag the
+          // marker would be written a second time, appending a new empty
+          // frame to the output.
+          let remaining = ctx
+            .encoder
+            .finish(&mut out_buffer, true)
+            .map_err(|e| {
+              JsErrorBox::generic(format!("Zstd finish error: {}", e))
+            })?;
+          ctx.finished = remaining == 0;
+        }
       }
       _ => {
         ctx
