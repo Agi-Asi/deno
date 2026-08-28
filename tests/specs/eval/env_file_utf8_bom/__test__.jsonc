@@ -1,0 +1,4 @@
+{
+  "args": "eval --env-file=env_file console.log(Deno.env.get(\"FIRST\") + \" \" + Deno.env.get(\"SECOND\"));",
+  "output": "main.out"
+}
