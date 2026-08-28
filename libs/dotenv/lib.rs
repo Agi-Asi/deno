@@ -154,6 +154,12 @@ fn parse_env_content_hook_impl(
   cb: &mut dyn FnMut(&str, &str),
 ) {
   let raw = content.as_bytes();
+  // Strip a leading UTF-8 byte order mark (U+FEFF). Some editors and
+  // `fs.writeFileSync(path, content, { encoding: "utf8" })` on Windows write
+  // a BOM at the start of `.env` files; without this the first variable is
+  // parsed with a leading U+FEFF in its key, so it is set under a mangled
+  // name (or dropped entirely) and `--env-file` silently loses it.
+  let raw = raw.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(raw);
   let mut filtered = Vec::new();
   let mut saw_cr = false;
   let mut text = {
@@ -784,6 +790,23 @@ IS NOT MULTILINE
         ("MULTI_NOT_VALID_QUOTE", "\""),
         ("MULTI_NOT_VALID", "THIS"),
       ],
+    );
+  }
+
+  #[test]
+  fn test_utf8_bom_prefix() {
+    // A UTF-8 BOM at the start of the file must not be included in the first
+    // variable's key. Regression test for `--env-file` dropping the first
+    // variable from a `.env` file that starts with a BOM.
+    let content = "\u{feff}FOO=bar\nBAZ=qux";
+    assert_parsed_eq(
+      content,
+      &[("FOO", "bar"), ("BAZ", "qux")],
+    );
+    assert_parsed_eq_with_substitution(
+      &sys_traits::impls::InMemorySys::default(),
+      content,
+      &[("FOO", "bar"), ("BAZ", "qux")],
     );
   }
 
