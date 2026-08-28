@@ -7,26 +7,25 @@ touching `deno add`, `deno install <pkg>`, or the flags that control where a
 dependency is written (`--dev`, `--save-optional`, `--no-save`, `--save-exact`,
 `--package-json`).
 
-## The two flag parsers
+## The flag parser
 
-Flag parsing currently lives in **two** places and both must be kept in sync
-(the second is replacing the first, see the CLI-parser-split work):
+Flag parsing for `add` and `install` lives in a single place, `libs/cli_parser/`
+(the `deno_cli_parser` crate). The old `clap`-based parser in
+`cli/args/flags.rs` was fully replaced by the CLI-parser-split work;
+`cli/args/flags.rs` now only re-exports the parsed flag structs
+(`pub use deno_cli_parser::flags::*`).
 
-- `cli/args/flags.rs` — the legacy `clap`-based parser. The `add` subcommand is
-  defined in `add_subcommand()`; `install` reuses the shared argument builders
-  (`add_dev_arg()`, `add_optional_arg()`, `add_no_save_arg()`). Both funnel into
-  `add_parse_inner()`, which builds the `AddFlags` struct.
-- `libs/cli_parser/` — the newer hand-written parser. Command shape is declared
-  in `src/defs.rs` (`ADD_SUBCOMMAND`, `INSTALL_SUBCOMMAND`) and converted to
-  flags in `src/convert.rs` (`add_parse`, and the install branch that produces
-  `InstallFlagsLocal::Add`).
+- Command shape is declared in `src/defs.rs` (`ADD_SUBCOMMAND`,
+  `INSTALL_SUBCOMMAND`).
+- The parsed result is converted to flags in `src/convert.rs`: `add_parse`
+  builds `AddFlags`, and the `install` branch produces
+  `InstallFlagsLocal::Add(AddFlags)`.
 
 `AddFlags` itself is defined in `libs/cli_parser/src/flags.rs` and re-exported
 through `crate::args`. When you add a field, you must update: the struct, both
-parsers, and every `AddFlags { .. }` literal (there are literals in the parser
-test suites `cli/args/flags.rs` and `libs/cli_parser/src/tests_full.rs`; the
-shared test case is `add_or_install_subcommand`, which loops over both `add` and
-`install`).
+`AddFlags { .. }` literals in `src/convert.rs`, and the shared test case
+`add_or_install_subcommand` in `src/tests_full.rs` (which loops over both `add`
+and `install`).
 
 There is a lint (`ensureNoNonPermissionCapitalLetterShortFlags` in
 `tools/lint.js`) that forbids capital-letter short flags unless they are on an
@@ -116,11 +115,9 @@ section now runs when there is either an import map _or_ additional roots, so
   subset with `./x test-spec add::`. A spec test that only needs the config
   result (not the download noise) uses `"output": "[WILDCARD]"` for the `add`
   step and asserts the file contents in a following `eval` step.
-- Parser unit tests: `add_or_install_subcommand` in both `cli/args/flags.rs`
-  (run via `cargo test -p deno --lib add_or_install`) and
-  `libs/cli_parser/src/tests_full.rs`
-  (`cargo test -p deno_cli_parser
-  add_or_install`).
+- Parser unit tests: `add_or_install_subcommand` in
+  `libs/cli_parser/src/tests_full.rs` (run via
+  `cargo test -p deno_cli_parser add_or_install`).
 
 ## Related work / next steps
 
