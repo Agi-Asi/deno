@@ -1,0 +1,17 @@
+{
+  "tempDir": true,
+  "tests": {
+    "declaration_with_custom_lib": {
+      "steps": [
+        {
+          "args": "transpile main.ts -o out.js --declaration",
+          "output": "[WILDCARD]deno transpile is experimental and subject to changes\nEmit [WILDCARD]out.js\nEmit [WILDCARD]main.d.ts\n"
+        },
+        {
+          "args": "run --allow-read check_dts.ts",
+          "output": "true\n"
+        }
+      ]
+    }
+  }
+}
