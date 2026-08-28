@@ -34,6 +34,9 @@ Key entry points:
   `cli/tools/fmt.rs` for a simple command, `cli/tools/test/` for a complex one).
 - `cli/module_loader.rs` — resolves and loads modules, bridging the resolver and
   the graph to the runtime.
+- `cli/tsc/` — TypeScript compiler integration: the Rust client and JS host for
+  the in-process compiler, plus the client for the out-of-process native
+  (`tsgo`) type-checker that `deno check` runs (`cli/tsc/native.rs`).
 
 The CLI is intentionally heavy: it pulls in TypeScript checking, npm and JSR
 resolution, the lockfile, and the bundler. Lower layers must not depend back up
@@ -99,8 +102,6 @@ Notable members:
 - `libs/resolver`, `libs/node_resolver`, `libs/npm`, `libs/npm_installer`,
   `libs/package_json`, `libs/lockfile`, `libs/config`, `libs/npmrc` — the
   resolution and package-management building blocks the CLI composes.
-- `libs/typescript_go_client` — client for the out-of-process TypeScript
-  type-checker.
 
 These crates are deliberately free of CLI concerns so they can be unit-tested in
 isolation and reused by other tools.
