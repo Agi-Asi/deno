@@ -26,6 +26,7 @@ import {
   gzipSync,
   unzipSync,
   zstdCompressSync,
+  zstdDecompressSync,
 } from "node:zlib";
 import { Buffer } from "node:buffer";
 import { createReadStream, createWriteStream } from "node:fs";
@@ -53,6 +54,20 @@ Deno.test("brotli compression async", async () => {
     })
   );
   assertEquals(decompressed.toString(), "hello world");
+});
+
+Deno.test("zstdCompressSync does not append an empty frame on chunk boundaries", () => {
+  const input = Buffer.from(Array.from({ length: 128 }, (_, index) => index));
+  const reference = zstdCompressSync(input);
+  for (const chunkSize of [constants.Z_MIN_CHUNK, reference.length]) {
+    const compressed = zstdCompressSync(input, { chunkSize });
+    // The output must be exactly the single frame produced with the default
+    // chunk size. Previously, when the completed frame exactly filled an
+    // output chunk, the end-of-frame marker was written a second time on the
+    // following write call, appending a 9-byte empty frame to the output.
+    assertEquals(compressed.length, reference.length);
+    assert(zstdDecompressSync(compressed).equals(input));
+  }
 });
 
 Deno.test("gzip compression sync", () => {
